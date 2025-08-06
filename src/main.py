@@ -1,5 +1,6 @@
 from agents.langchain_chat_agent import LangChainChatAgent
-from agents.sophisticated_agent import SophisticatedAgent
+from agents.agent1_context_awareness import SophisticatedAgent
+from agents.agent2_qa import QAAgent
 import uuid
 
 def test_sophisticated_agent():
@@ -63,17 +64,56 @@ def chat_demo():
         response = agent.respond(user_input, session_id)
         print(f"Agente: {response}")
 
+def qa_demo():
+    """Demo del agente QA con memoria."""
+    agent = QAAgent()
+    agent.initialize()
+    
+    print("\n=== Agente QA con Memoria ===")
+    print("¡Hola! Soy un agente de preguntas y respuestas con memoria.")
+    print("Puedo recordar nuestra conversación anterior.")
+    print("\nComandos especiales:")
+    print("- 'limpiar' para limpiar la memoria")
+    print("- 'historial' para ver el historial de conversación")
+    print("- 'salir' para terminar")
+    print("-" * 60)
+    
+    while True:
+        user_question = input("Tú: ")
+        
+        if user_question.lower() == 'salir':
+            print("Agente: ¡Hasta luego!")
+            break
+        elif user_question.lower() == 'limpiar':
+            agent.clear_memory()
+            continue
+        elif user_question.lower() == 'historial':
+            history = agent.get_conversation_history()
+            print("\n--- Historial de Conversación ---")
+            for msg in history:
+                role = "Tú" if msg["role"] == "user" else "Agente"
+                print(f"{role}: {msg['content']}")
+            print("-" * 30 + "\n")
+            continue
+        
+        # Get response from agent
+        ai_answer = agent.respond(user_question)
+        print(f"Agente: {ai_answer}")
+
 def main():
     print("Selecciona qué demo ejecutar:")
     print("1. SophisticatedAgent (Análisis de texto)")
     print("2. ChatAgent (Conversación con memoria)")
+    print("3. QAAgent (Preguntas y respuestas con memoria)")
     
-    choice = input("\nElige una opción (1 o 2): ").strip()
+    choice = input("\nElige una opción (1, 2 o 3): ").strip()
     
     if choice == "1":
         test_sophisticated_agent()
     elif choice == "2":
         chat_demo()
+    elif choice == "3":
+        qa_demo()
     else:
         print("Opción inválida. Ejecutando SophisticatedAgent por defecto...")
         test_sophisticated_agent()

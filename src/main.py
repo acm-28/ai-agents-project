@@ -1,5 +1,6 @@
 from agents.langchain_chat_agent import LangChainChatAgent
 from agents.sophisticated_agent import SophisticatedAgent
+import uuid
 
 def test_sophisticated_agent():
     """Ejemplo de uso del SophisticatedAgent como se muestra en la guía"""
@@ -31,15 +32,15 @@ additionally, the model is designed to be more efficient and scalable than its p
     return result
 
 def chat_demo():
-    """Demo del chat agent original"""
-    # Crear e inicializar el agente
+    """Demo del chat agent con memoria de conversación."""
     agent = LangChainChatAgent()
     agent.initialize()
     
-    # Personalizar el comportamiento del agente (opcional)
-    agent.set_system_message("Eres un asistente de programación especializado en Python y AI.")
+    # Generar un ID de sesión único para esta conversación
+    session_id = str(uuid.uuid4())
     
-    print("¡Hola! Soy tu asistente de chat con LangChain.")
+    print("¡Hola! Soy tu asistente de chat con memoria.")
+    print(f"ID de sesión: {session_id}")
     print("Escribe 'salir' para terminar la conversación.")
     
     while True:
@@ -47,19 +48,25 @@ def chat_demo():
         
         if user_input.lower() in ["salir", "exit", "quit"]:
             print("Agente: ¡Hasta luego! Que tengas un buen día.")
+            
+            # Opcional: Mostrar el historial de la conversación al final
+            print("\nHistorial de la conversación:")
+            history = agent.get_session_history(session_id)
+            for msg in history.messages:
+                print(f"- {msg.type.capitalize()}: {msg.content}")
             break
         
         if user_input.strip() == "":
             print("Agente: Por favor, escribe un mensaje.")
             continue
             
-        response = agent.respond(user_input)
+        response = agent.respond(user_input, session_id)
         print(f"Agente: {response}")
 
 def main():
     print("Selecciona qué demo ejecutar:")
     print("1. SophisticatedAgent (Análisis de texto)")
-    print("2. ChatAgent (Conversación)")
+    print("2. ChatAgent (Conversación con memoria)")
     
     choice = input("\nElige una opción (1 o 2): ").strip()
     

@@ -1,4 +1,4 @@
-from src.agents.sophisticated_agent import SophisticatedAgent
+from src.agents.agent0_langGraph import SophisticatedAgent
 
 def test_sophisticated_agent():
     # Texto de ejemplo de la guía

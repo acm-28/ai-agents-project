@@ -1,5 +1,5 @@
-from agents.langchain_chat_agent import LangChainChatAgent
-from agents.agent1_context_awareness import SophisticatedAgent
+from agents.agent1_context_awareness import LangChainChatAgent
+from agents.agent0_langGraph import SophisticatedAgent  # Fix this import
 from agents.agent2_qa import QAAgent
 import uuid
 

@@ -1,101 +1,69 @@
-﻿import os
-from typing import TypedDict, List
+import os
 from dotenv import load_dotenv
-from langgraph.graph import StateGraph, END
-from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory
 from agents.base_agent import BaseAgent
 
-# Definir la memoria del agente
-class State(TypedDict):
-    text: str
-    classification: str
-    entities: List[str]
-    summary: str
-
-class SophisticatedAgent(BaseAgent):
+class LangChainChatAgent(BaseAgent):
     def __init__(self):
         self.llm = None
-        self.app = None
-    
+        self.system_message = "Eres un asistente útil y amigable."
+        self.chain_with_history = None
+        self.store = {}
+
     def initialize(self):
+        """Inicializa el agente LangChain con OpenAI y memoria de conversación."""
         load_dotenv()
-        api_key = os.getenv('OPENAI_API_KEY')
-        
+        api_key = os.getenv("OPENAI_API_KEY")
+
         if not api_key:
-            raise ValueError('No se encontró OPENAI_API_KEY')
-        
-        self.llm = ChatOpenAI(model='gpt-3.5-turbo', temperature=0, openai_api_key=api_key)
-        self._build_workflow()
-        print('SophisticatedAgent inicializado correctamente')
-    
-    def _build_workflow(self):
-        workflow = StateGraph(State)
-        workflow.add_node('classification_node', self._classification_node)
-        workflow.add_node('entity_extraction', self._entity_extraction_node)
-        workflow.add_node('summarization', self._summarization_node)
-        workflow.set_entry_point('classification_node')
-        workflow.add_edge('classification_node', 'entity_extraction')
-        workflow.add_edge('entity_extraction', 'summarization')
-        workflow.add_edge('summarization', END)
-        self.app = workflow.compile()
-    
-    def _classification_node(self, state: State):
-        prompt = PromptTemplate(
-            input_variables=['text'],
-            template='Classify the following text into one of the categories: News, Blog, Research, or Other.\n\nText:{text}\n\nCategory:'
+            raise ValueError("No se encontró OPENAI_API_KEY en las variables de entorno.")
+
+        self.llm = ChatOpenAI(
+            model="gpt-3.5-turbo",
+            temperature=0.7,
+            max_tokens=150,
+            openai_api_key=api_key
         )
-        message = HumanMessage(content=prompt.format(text=state['text']))
-        classification = self.llm.invoke([message]).content.strip()
-        return {'classification': classification}
-    
-    def _entity_extraction_node(self, state: State):
-        prompt = PromptTemplate(
-            input_variables=['text'],
-            template='Extract all the entities (Person, Organization, Location) from the following text. Provide the result as a comma-separated list.\n\nText:{text}\n\nEntities:'
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", self.system_message),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{input}"),
+        ])
+
+        chain = prompt | self.llm
+
+        self.chain_with_history = RunnableWithMessageHistory(
+            chain,
+            self.get_session_history,
+            input_messages_key="input",
+            history_messages_key="history",
         )
-        message = HumanMessage(content=prompt.format(text=state['text']))
-        entities_str = self.llm.invoke([message]).content.strip()
-        entities = [entity.strip() for entity in entities_str.split(', ') if entity.strip()]
-        return {'entities': entities}
-    
-    def _summarization_node(self, state: State):
-        prompt = PromptTemplate(
-            input_variables=['text'],
-            template='Summarize the following text in one short sentence.\n\nText:{text}\n\nSummary:'
-        )
-        message = HumanMessage(content=prompt.format(text=state['text']))
-        summary = self.llm.invoke([message]).content.strip()
-        return {'summary': summary}
-    
-    def respond(self, message: str) -> str:
+
+        print("LangChainChatAgent con memoria inicializado correctamente.")
+
+    def get_session_history(self, session_id: str) -> ChatMessageHistory:
+        """Obtiene el historial de una sesión o crea uno nuevo."""
+        if session_id not in self.store:
+            self.store[session_id] = ChatMessageHistory()
+        return self.store[session_id]
+
+    def respond(self, message: str, session_id: str) -> str:
+        """Responde a un mensaje usando LangChain y el historial de la sesión."""
         try:
-            state_input = {'text': message}
-            result = self.app.invoke(state_input)
-            
-            response = f'''Análisis completado:
-
- Clasificación: {result.get('classification', 'N/A')}
-
- Entidades: {', '.join(result.get('entities', []))}
-
- Resumen: {result.get('summary', 'N/A')}'''
-            
-            return response
-            
+            response = self.chain_with_history.invoke(
+                {"input": message},
+                config={"configurable": {"session_id": session_id}}
+            )
+            return response.content.strip()
         except Exception as e:
-            return f'Error al procesar: {str(e)}'
-    
-    def analyze_text(self, text: str) -> dict:
-        try:
-            state_input = {'text': text}
-            result = self.app.invoke(state_input)
-            return result
-        except Exception as e:
-            return {'error': str(e)}
+            return f"Error al procesar el mensaje: {str(e)}"
 
-def run_sophisticated_agent(text: str) -> dict:
-    agent = SophisticatedAgent()
-    agent.initialize()
-    return agent.analyze_text(text)
+    def set_system_message(self, system_message: str):
+        """Permite cambiar el mensaje del sistema."""
+        self.system_message = system_message
+        # Es necesario reinicializar para que el prompt se actualice
+        self.initialize()

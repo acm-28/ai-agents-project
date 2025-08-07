@@ -1,6 +1,7 @@
 from agents.agent1_context_awareness import LangChainChatAgent
 from agents.agent0_langGraph import SophisticatedAgent  # Fix this import
 from agents.agent2_qa import QAAgent
+from agents.agent3_data_analysis import DataAnalysisAgent
 import uuid
 
 def test_sophisticated_agent():
@@ -100,13 +101,71 @@ def qa_demo():
         ai_answer = agent.respond(user_question)
         print(f"Agente: {ai_answer}")
 
+def data_analysis_demo():
+    """Demo del agente de análisis de datos con memoria y LangGraph."""
+    agent = DataAnalysisAgent()
+    agent.initialize()
+    
+    print("\n=== Agente de Análisis de Datos ===")
+    print("¡Hola! Soy un agente especializado en análisis de datos.")
+    print("Tengo un dataset de ejemplo cargado (ventas de autos) y puedo recordar nuestra conversación.")
+    print("\nEjemplos de preguntas que puedes hacer:")
+    print("- ¿Cuántas filas tiene el dataset?")
+    print("- ¿Cuál es el precio promedio de los autos?")
+    print("- ¿Qué marca de auto es la más común?")
+    print("- Muestra estadísticas de los autos BMW")
+    print("- ¿Cuáles son las columnas del dataset?")
+    print("\nComandos especiales:")
+    print("- 'info' para ver información del dataset")
+    print("- 'nueva_sesion' para crear una nueva sesión")
+    print("- 'limpiar_sesion' para limpiar la memoria de la sesión actual")
+    print("- 'sesiones' para ver sesiones disponibles")
+    print("- 'salir' para terminar")
+    print("-" * 70)
+    
+    current_session = "session_1"
+    print(f"Sesión actual: {current_session}")
+    
+    while True:
+        user_question = input("Tú: ")
+        
+        if user_question.lower() == 'salir':
+            print("Agente: ¡Hasta luego! Espero que el análisis haya sido útil.")
+            break
+        elif user_question.lower() == 'info':
+            info = agent.get_dataset_info()
+            print("\n--- Información del Dataset ---")
+            print(f"Forma: {info['shape']}")
+            print(f"Columnas: {info['columns']}")
+            print(f"Uso de memoria: {info['memory_usage']}")
+            print("-" * 30 + "\n")
+            continue
+        elif user_question.lower() == 'nueva_sesion':
+            import time
+            current_session = f"session_{int(time.time())}"
+            print(f"Nueva sesión creada: {current_session}")
+            continue
+        elif user_question.lower() == 'limpiar_sesion':
+            result = agent.clear_session_memory(current_session)
+            print(f"Agente: {result}")
+            continue
+        elif user_question.lower() == 'sesiones':
+            sessions = agent.get_available_sessions()
+            print(f"Sesiones disponibles: {sessions}")
+            continue
+        
+        # Procesar la consulta con el agente
+        response = agent.respond(user_question, current_session)
+        print(f"Agente: {response}")
+
 def main():
     print("Selecciona qué demo ejecutar:")
     print("1. SophisticatedAgent (Análisis de texto)")
     print("2. ChatAgent (Conversación con memoria)")
     print("3. QAAgent (Preguntas y respuestas con memoria)")
+    print("4. DataAnalysisAgent (Análisis de datos con memoria y LangGraph)")
     
-    choice = input("\nElige una opción (1, 2 o 3): ").strip()
+    choice = input("\nElige una opción (1, 2, 3 o 4): ").strip()
     
     if choice == "1":
         test_sophisticated_agent()
@@ -114,9 +173,11 @@ def main():
         chat_demo()
     elif choice == "3":
         qa_demo()
+    elif choice == "4":
+        data_analysis_demo()
     else:
-        print("Opción inválida. Ejecutando SophisticatedAgent por defecto...")
-        test_sophisticated_agent()
+        print("Opción inválida. Ejecutando DataAnalysisAgent por defecto...")
+        data_analysis_demo()
 
 if __name__ == "__main__":
     main()

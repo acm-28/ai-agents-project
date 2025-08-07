@@ -29,8 +29,8 @@ class QAAgent(BaseAgent):
         
         # Initialize the language model
         self.llm = ChatOpenAI(
-            model="gpt-4o-mini", 
-            max_tokens=1000, 
+            model="gpt-3.5-turbo", 
+            max_tokens=150, 
             temperature=0.7,
             openai_api_key=api_key
         )

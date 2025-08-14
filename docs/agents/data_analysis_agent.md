@@ -596,7 +596,7 @@ if isinstance(input_data, str):
     kwargs = {}
 elif isinstance(input_data, dict):
     message = input_data.get('message', '')
-    kwargs = {k: v for k, v in input_data.items() if k != 'message'}
+    kwargs = {k: v for k, v in input_data.items() if k != 'message'}'}
 ```
 
 #### 2. **Clasificación de Request** (`_classify_request()`)

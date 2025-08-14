@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     # Configuración de datos
     data_dir: str = Field("data", description="Directorio de datos")
     cache_dir: str = Field("data/cache", description="Directorio de cache")
+    memory_dir: str = Field("data/memory", description="Directorio de memoria")
 
 # Instancia global de configuración
 settings = Settings()

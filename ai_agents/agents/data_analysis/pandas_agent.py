@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 
 from ai_agents.core.base_agent import BaseAgent
-from ai_agents.core.types import AgentResponse
+from ai_agents.core.types import AgentResponse, Message
 from ai_agents.agents.data_analysis.data_models import (
     AnalysisRequest, AnalysisResult, DataAnalysisState, DatasetInfo
 )
@@ -65,6 +65,8 @@ class PandasAgent(BaseAgent):
         Returns:
             Respuesta del agente
         """
+        logger.debug(f"process() input_data: {input_data} (tipo: {type(input_data)})")
+        
         if isinstance(input_data, str):
             message = input_data
             kwargs = {}
@@ -75,6 +77,7 @@ class PandasAgent(BaseAgent):
             message = str(input_data)
             kwargs = {}
         
+        logger.debug(f"process() parseado - message: '{message}', kwargs: {kwargs}")
         return await self._safe_process(message, **kwargs)
     
     async def _safe_process(self, message: str, **kwargs) -> AgentResponse:
@@ -189,7 +192,7 @@ class PandasAgent(BaseAgent):
                     "data_loaded": True,
                     "rows": len(self.current_dataframe),
                     "columns": len(self.current_dataframe.columns),
-                    "dataset_info": self.current_dataset_info.model_dump() if self.current_dataset_info else None
+                    "dataset_info": self.current_dataset_info.dict() if self.current_dataset_info else None
                 }
             )
             
@@ -404,7 +407,7 @@ Datos Faltantes:
         try:
             result = await asyncio.to_thread(
                 self.tools.export_analysis,
-                self.last_analysis_result.model_dump(),
+                self.last_analysis_result.dict(),
                 output_path,
                 format_type
             )
@@ -454,6 +457,21 @@ Ejemplos de uso:
             metadata["has_data"] = True
         
         return AgentResponse(content=response_text, metadata=metadata)
+    
+    async def process_request(self, input_data: Union[str, Dict, Message]) -> AgentResponse:
+        """
+        Interfaz pública para procesar requests.
+        Delega al método process con manejo seguro.
+        
+        Args:
+            input_data: Datos de entrada
+            
+        Returns:
+            AgentResponse con la respuesta del agente
+        """
+        # Debug logging para diagnosticar el problema
+        logger.debug(f"process_request recibió input_data: {input_data} (tipo: {type(input_data)})")
+        return await self.process(input_data)
     
     def get_capabilities(self) -> Dict[str, Any]:
         """Retorna las capacidades del agente."""

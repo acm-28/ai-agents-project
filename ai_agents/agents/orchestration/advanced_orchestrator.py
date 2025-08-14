@@ -21,9 +21,30 @@ import json
 
 from ...core.base_agent import BaseAgent
 from ...core.types import AgentResponse, AgentState
-from .agent_orchestrator import AgentOrchestrator, TaskType
+from ...utils.conversation_logger import conversation_logger
 
 logger = logging.getLogger(__name__)
+
+
+# Definiciones heredadas del AgentOrchestrator eliminado
+class TaskType(Enum):
+    """Tipos de tareas que puede manejar el orquestador."""
+    CHAT = "chat"
+    DATA_ANALYSIS = "data_analysis"
+    QA_MEMORY = "qa_memory"
+    TEXT_ANALYSIS = "text_analysis"
+    COMPLEX_WORKFLOW = "complex_workflow"
+    UNKNOWN = "unknown"
+
+
+@dataclass
+class TaskClassification:
+    """Clasificación de una tarea."""
+    task_type: TaskType
+    confidence: float
+    agent_name: str
+    reasoning: str
+    parameters: Dict[str, Any]
 
 
 class WorkflowStatus(Enum):
@@ -105,7 +126,7 @@ class AgentMetrics:
     max_concurrent: int = 5
 
 
-class AdvancedOrchestrator(AgentOrchestrator):
+class AdvancedOrchestrator(BaseAgent):
     """
     Orquestador avanzado con capacidades de workflows complejos.
     
@@ -119,6 +140,9 @@ class AdvancedOrchestrator(AgentOrchestrator):
     
     def __init__(self, max_parallel_executions: int = 3, **kwargs):
         super().__init__(**kwargs)
+        
+        # Registro de agentes especializados (heredado del AgentOrchestrator básico)
+        self.specialized_agents: Dict[str, BaseAgent] = {}
         
         # Configuración de paralelismo
         self.max_parallel_executions = max_parallel_executions
@@ -175,6 +199,92 @@ class AdvancedOrchestrator(AgentOrchestrator):
         
         logger.info("AdvancedOrchestrator inicializado correctamente")
     
+    async def process(self, input_data: Union[str, Dict, Any]) -> AgentResponse:
+        """
+        Procesa entrada usando clasificación automática y derivación a agentes especializados.
+        
+        Args:
+            input_data: Datos de entrada (string, dict o Message)
+            
+        Returns:
+            AgentResponse: Respuesta del agente apropiado
+        """
+        try:
+            # Convertir entrada a formato estándar
+            if isinstance(input_data, str):
+                task_input = {"task": input_data, "user_input": input_data}
+            elif isinstance(input_data, dict):
+                task_input = input_data
+            else:
+                task_input = {"task": str(input_data), "user_input": str(input_data)}
+            
+            # Clasificar automáticamente la tarea
+            task_classification = await self._classify_task(task_input.get("task", ""))
+            
+            # Obtener agente apropiado
+            if task_classification.task_type == TaskType.DATA_ANALYSIS:
+                agent = self.specialized_agents.get("pandas_agent")
+            elif task_classification.task_type == TaskType.TEXT_ANALYSIS:
+                agent = self.specialized_agents.get("sophisticated_agent")
+            elif task_classification.task_type == TaskType.COMPLEX_WORKFLOW:
+                agent = self.specialized_agents.get("sophisticated_agent")
+            else:  # Chat o otros
+                agent = self.specialized_agents.get("langchain_agent")
+            
+            if not agent:
+                # Fallback al primer agente disponible
+                agent = next(iter(self.specialized_agents.values()))
+            
+            # Procesar con el agente seleccionado
+            return await agent.process(task_input)
+            
+        except Exception as e:
+            logger.error(f"Error en AdvancedOrchestrator.process: {e}")
+            return AgentResponse(
+                content=f"Error procesando solicitud: {str(e)}",
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    async def _classify_task(self, task: str) -> 'TaskClassification':
+        """Clasifica una tarea para determinar el agente apropiado."""
+        task_lower = task.lower()
+        
+        # Patrones de clasificación básica
+        if any(word in task_lower for word in ['analizar', 'datos', 'csv', 'excel', 'pandas']):
+            return TaskClassification(
+                task_type=TaskType.DATA_ANALYSIS,
+                confidence=0.8,
+                agent_name="pandas_agent",
+                reasoning="Contiene palabras relacionadas con análisis de datos",
+                parameters={}
+            )
+        elif any(word in task_lower for word in ['texto', 'documento', 'resumir', 'analizar texto']):
+            return TaskClassification(
+                task_type=TaskType.TEXT_ANALYSIS,
+                confidence=0.8,
+                agent_name="sophisticated_agent",
+                reasoning="Contiene palabras relacionadas con procesamiento de texto",
+                parameters={}
+            )
+        elif any(word in task_lower for word in ['workflow', 'complejo', 'múltiples pasos']):
+            return TaskClassification(
+                task_type=TaskType.COMPLEX_WORKFLOW,
+                confidence=0.8,
+                agent_name="sophisticated_agent",
+                reasoning="Indica proceso complejo o workflow",
+                parameters={}
+            )
+        else:
+            return TaskClassification(
+                task_type=TaskType.CHAT,
+                confidence=0.6,
+                agent_name="langchain_agent",
+                reasoning="Chat general o consulta",
+                parameters={}
+            )
+    
     async def _load_predefined_workflows(self) -> None:
         """Carga workflows predefinidos."""
         # Workflow de análisis completo de datos
@@ -202,7 +312,7 @@ class AdvancedOrchestrator(AgentOrchestrator):
                 ),
                 WorkflowStep(
                     step_id="qa_validation",
-                    agent_type="memory_qa_agent",
+                    agent_type="langchain_agent",
                     task_config={"action": "validate_results"},
                     dependencies=["text_summary"]
                 )
@@ -235,7 +345,7 @@ class AdvancedOrchestrator(AgentOrchestrator):
                 ),
                 WorkflowStep(
                     step_id="store_knowledge",
-                    agent_type="memory_qa_agent",
+                    agent_type="langchain_agent",
                     task_config={"action": "store_information"},
                     dependencies=["generate_summary"]
                 )
@@ -284,15 +394,67 @@ class AdvancedOrchestrator(AgentOrchestrator):
         self.active_workflows[execution_id] = execution
         self.system_metrics['total_workflows'] += 1
         
+        # Iniciar logging de conversación para el workflow
+        conversation_log_id = conversation_logger.log_conversation_start(
+            agent_id=self.agent_id,
+            session_id=execution_id,
+            agent_type="AdvancedOrchestrator",
+            user_id=input_data.get("user_id"),
+            metadata={
+                "workflow_id": workflow_id,
+                "workflow_name": workflow_def.name,
+                "num_steps": len(workflow_def.steps),
+                "max_parallel": workflow_def.max_parallel
+            }
+        )
+        
+        # Log de inicio del workflow
+        conversation_logger.log_orchestrator_action(
+            conversation_log_id=conversation_log_id,
+            action=f"Iniciando workflow '{workflow_def.name}'",
+            reasoning=f"Workflow {workflow_id} con {len(workflow_def.steps)} pasos",
+            metadata={
+                "workflow_id": workflow_id,
+                "execution_id": execution_id,
+                "input_data": input_data
+            }
+        )
+        
         # Ejecutar hooks antes de empezar
         await self._run_hooks('before_start', execution)
         
         # Ejecutar workflow y esperar que termine
-        await self._execute_workflow_async(execution)
+        await self._execute_workflow_async(execution, conversation_log_id)
+        
+        # Log de finalización del workflow
+        conversation_logger.log_orchestrator_action(
+            conversation_log_id=conversation_log_id,
+            action=f"Workflow completado con estado: {execution.status.value}",
+            metadata={
+                "execution_id": execution_id,
+                "final_status": execution.status.value,
+                "completed_steps": len(execution.results),
+                "total_steps": len(workflow_def.steps),
+                "errors": execution.errors
+            }
+        )
+        
+        # Finalizar logging de conversación
+        conversation_logger.log_conversation_end(
+            conversation_log_id=conversation_log_id,
+            reason="workflow_completed",
+            summary={
+                "workflow_id": workflow_id,
+                "status": execution.status.value,
+                "execution_time": (execution.end_time - execution.start_time).total_seconds() if execution.start_time and execution.end_time else None,
+                "steps_completed": len(execution.results),
+                "steps_total": len(workflow_def.steps)
+            }
+        )
         
         return execution
     
-    async def _execute_workflow_async(self, execution: WorkflowExecution) -> None:
+    async def _execute_workflow_async(self, execution: WorkflowExecution, conversation_log_id: Optional[str] = None) -> None:
         """Ejecuta un workflow de forma asíncrona."""
         try:
             execution.status = WorkflowStatus.RUNNING
@@ -334,7 +496,7 @@ class AdvancedOrchestrator(AgentOrchestrator):
                 
                 for step in ready_steps:
                     task = asyncio.create_task(
-                        self._execute_step_with_semaphore(semaphore, execution, step)
+                        self._execute_step_with_semaphore(semaphore, execution, step, conversation_log_id)
                     )
                     tasks.append(task)
                 
@@ -386,15 +548,33 @@ class AdvancedOrchestrator(AgentOrchestrator):
     
     async def _execute_step_with_semaphore(self, semaphore: asyncio.Semaphore,
                                          execution: WorkflowExecution, 
-                                         step: WorkflowStep) -> Tuple[str, bool, Optional[str]]:
+                                         step: WorkflowStep,
+                                         conversation_log_id: Optional[str] = None) -> Tuple[str, bool, Optional[str]]:
         """Ejecuta un paso del workflow con control de concurrencia."""
         async with semaphore:
-            return await self._execute_step(execution, step)
+            return await self._execute_step(execution, step, conversation_log_id)
     
     async def _execute_step(self, execution: WorkflowExecution, 
-                          step: WorkflowStep) -> Tuple[str, bool, Optional[str]]:
+                          step: WorkflowStep,
+                          conversation_log_id: Optional[str] = None) -> Tuple[str, bool, Optional[str]]:
         """Ejecuta un paso individual del workflow."""
         last_error = None
+        
+        # Log de inicio del paso
+        if conversation_log_id:
+            conversation_logger.log_orchestrator_action(
+                conversation_log_id=conversation_log_id,
+                action=f"Iniciando paso '{step.step_id}'",
+                agent_selected=step.agent_type,
+                reasoning=f"Ejecutando paso {step.step_id} del workflow con agente {step.agent_type}",
+                metadata={
+                    "step_id": step.step_id,
+                    "agent_type": step.agent_type,
+                    "dependencies": step.dependencies,
+                    "attempt": 1,
+                    "max_retries": step.max_retries
+                }
+            )
         
         # Bucle de reintentos
         for attempt in range(step.max_retries + 1):
@@ -405,14 +585,33 @@ class AdvancedOrchestrator(AgentOrchestrator):
                 
                 logger.debug(f"Ejecutando paso {step.step_id} (intento {attempt + 1}) del workflow {execution.execution_id}")
                 
+                # Log de intento de ejecución
+                if conversation_log_id and attempt > 0:
+                    conversation_logger.log_orchestrator_action(
+                        conversation_log_id=conversation_log_id,
+                        action=f"Reintentando paso '{step.step_id}' (intento {attempt + 1})",
+                        metadata={
+                            "step_id": step.step_id,
+                            "attempt": attempt + 1,
+                            "previous_error": last_error
+                        }
+                    )
+                
                 # Seleccionar agente apropiado
+                logger.debug(f"Seleccionando agente del tipo: {step.agent_type}")
                 agent = await self._select_best_agent(step.agent_type)
+                logger.debug(f"Agente seleccionado: {agent}")
                 if not agent:
                     raise Exception(f"No hay agente disponible del tipo {step.agent_type}")
                 
                 # Preparar datos del paso
+                logger.debug(f"Resolviendo inputs para step.task_config: {step.task_config}")
                 step_data = self._resolve_step_inputs(step.task_config, execution.results)
+                logger.debug(f"step_data después de _resolve_step_inputs: {step_data}")
                 step_data.update(execution.context)
+                logger.debug(f"step_data después de update con context: {step_data}")
+                
+                logger.debug(f"Datos enviados al agente {step.agent_type}: {step_data}")
                 
                 # Ejecutar con timeout
                 result = await asyncio.wait_for(
@@ -428,6 +627,20 @@ class AdvancedOrchestrator(AgentOrchestrator):
                 step.status = StepStatus.COMPLETED
                 execution.results[step.step_id] = result
                 
+                # Log de finalización exitosa del paso
+                if conversation_log_id:
+                    conversation_logger.log_orchestrator_action(
+                        conversation_log_id=conversation_log_id,
+                        action=f"Paso '{step.step_id}' completado exitosamente",
+                        metadata={
+                            "step_id": step.step_id,
+                            "agent_type": step.agent_type,
+                            "execution_time": (datetime.now() - step.start_time).total_seconds(),
+                            "attempt": attempt + 1,
+                            "result_content_length": len(result.content) if hasattr(result, 'content') else 0
+                        }
+                    )
+                
                 # Actualizar métricas del agente
                 await self._update_agent_metrics(step.agent_type, True, 
                                                (datetime.now() - step.start_time).total_seconds())
@@ -437,9 +650,37 @@ class AdvancedOrchestrator(AgentOrchestrator):
             except asyncio.TimeoutError:
                 last_error = f"Timeout ejecutando paso {step.step_id}"
                 logger.warning(last_error)
+                
+                # Log de timeout
+                if conversation_log_id:
+                    conversation_logger.log_orchestrator_action(
+                        conversation_log_id=conversation_log_id,
+                        action=f"Timeout en paso '{step.step_id}'",
+                        metadata={
+                            "step_id": step.step_id,
+                            "agent_type": step.agent_type,
+                            "attempt": attempt + 1,
+                            "timeout_seconds": step.timeout_seconds,
+                            "error": last_error
+                        }
+                    )
             except Exception as e:
                 last_error = f"Error en paso {step.step_id}: {str(e)}"
                 logger.warning(last_error)
+                
+                # Log de error
+                if conversation_log_id:
+                    conversation_logger.log_orchestrator_action(
+                        conversation_log_id=conversation_log_id,
+                        action=f"Error en paso '{step.step_id}'",
+                        metadata={
+                            "step_id": step.step_id,
+                            "agent_type": step.agent_type,
+                            "attempt": attempt + 1,
+                            "error_type": type(e).__name__,
+                            "error": last_error
+                        }
+                    )
             
             # Si no es el último intento y auto_retry está habilitado, esperar antes del siguiente intento
             if attempt < step.max_retries and execution.workflow_def.auto_retry:
@@ -452,6 +693,19 @@ class AdvancedOrchestrator(AgentOrchestrator):
         step.error = last_error
         execution.errors.append(f"Paso {step.step_id}: {last_error}")
         
+        # Log de fallo definitivo del paso
+        if conversation_log_id:
+            conversation_logger.log_orchestrator_action(
+                conversation_log_id=conversation_log_id,
+                action=f"Paso '{step.step_id}' falló definitivamente",
+                metadata={
+                    "step_id": step.step_id,
+                    "agent_type": step.agent_type,
+                    "total_attempts": step.max_retries + 1,
+                    "final_error": last_error
+                }
+            )
+        
         # Actualizar métricas del agente
         await self._update_agent_metrics(step.agent_type, False, 0)
         
@@ -459,18 +713,50 @@ class AdvancedOrchestrator(AgentOrchestrator):
     
     async def _select_best_agent(self, agent_type: str) -> Optional[BaseAgent]:
         """Selecciona el mejor agente disponible según métricas."""
+        logger.debug(f"_select_best_agent iniciado para tipo: {agent_type}")
+        logger.debug(f"load_balancing_enabled: {self.load_balancing_enabled}")
+        
         if not self.load_balancing_enabled:
-            return self.specialized_agents.get(agent_type)
+            agent = self.specialized_agents.get(agent_type)
+            logger.debug(f"Load balancing deshabilitado, agente obtenido: {agent}")
+            return agent
         
         # Buscar agentes del tipo solicitado
         candidates = []
+        logger.debug(f"Agentes especializados disponibles: {list(self.specialized_agents.keys())}")
+        
         for agent_name, agent in self.specialized_agents.items():
-            if agent_type in agent_name and agent.is_ready():
-                metrics = self.agent_metrics.get(agent_name)
-                if metrics and metrics.current_load < metrics.max_concurrent:
-                    candidates.append((agent, metrics))
+            logger.debug(f"Evaluando agente: {agent_name}, tipo buscado: {agent_type}")
+            
+            if agent_type in agent_name:
+                logger.debug(f"Agente {agent_name} coincide con tipo {agent_type}")
+                
+                try:
+                    # Aquí estaba el problema - is_ready es una propiedad, no un método
+                    logger.debug(f"Tipo de agent.is_ready: {type(agent.is_ready)}")
+                    is_ready_result = agent.is_ready  # Cambio: sin paréntesis
+                    logger.debug(f"agent.is_ready retornó: {is_ready_result}")
+                    
+                    if is_ready_result:
+                        metrics = self.agent_metrics.get(agent_name)
+                        if metrics and metrics.current_load < metrics.max_concurrent:
+                            candidates.append((agent, metrics))
+                            logger.debug(f"Agente {agent_name} añadido como candidato")
+                        else:
+                            logger.debug(f"Agente {agent_name} no añadido: metrics={metrics}")
+                    else:
+                        logger.debug(f"Agente {agent_name} no está ready")
+                        
+                except Exception as e:
+                    logger.error(f"Error accediendo is_ready en agente {agent_name}: {e}")
+                    logger.error(f"Tipo de agent: {type(agent)}")
+                    logger.error(f"Atributos del agente: {dir(agent)}")
+                    raise
+            else:
+                logger.debug(f"Agente {agent_name} no coincide con tipo {agent_type}")
         
         if not candidates:
+            logger.debug("No se encontraron candidatos")
             return None
         
         # Seleccionar el agente con menor carga y mejor rendimiento
@@ -490,6 +776,7 @@ class AdvancedOrchestrator(AgentOrchestrator):
         if agent_name:
             self.agent_metrics[agent_name].current_load += 1
         
+        logger.debug(f"Agente seleccionado: {best_agent}")
         return best_agent
     
     async def _update_agent_metrics(self, agent_type: str, success: bool, 

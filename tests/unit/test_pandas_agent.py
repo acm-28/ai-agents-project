@@ -20,7 +20,7 @@ class TestPandasAgent:
     @pytest_asyncio.fixture
     async def agent(self):
         """Fixture del agente."""
-        agent = PandasAgent()
+        agent = PandasAgent(agent_id="test_pandas_agent_fixed_id")
         await agent.initialize()
         return agent
     

@@ -11,6 +11,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 
 from .main import cli_context
+from ai_agents.utils.conversation_logger import conversation_logger
 
 
 @click.group()
@@ -60,7 +61,7 @@ def analyze(file_path, operations, output):
             output_data = {
                 "file_path": str(file_path),
                 "operations": list(operations),
-                "success": result.success,
+                "success": result.is_success(),
                 "analysis": result.content,
                 "metadata": result.metadata,
                 "timestamp": datetime.now().isoformat()
@@ -121,7 +122,7 @@ def clean(file_path, columns, operation, output):
             output_data = {
                 "file_path": str(file_path),
                 "operation": operation,
-                "success": result.success,
+                "success": result.is_success(),
                 "result": result.content,
                 "metadata": result.metadata,
                 "output_file": str(output) if output else None,
@@ -175,7 +176,7 @@ def process(text_input, operation, language):
                 "text_preview": text_input[:100] + "..." if len(text_input) > 100 else text_input,
                 "operation": operation,
                 "language": language,
-                "success": result.success,
+                "success": result.is_success(),
                 "result": result.content,
                 "metadata": result.metadata,
                 "timestamp": datetime.now().isoformat()
@@ -237,7 +238,7 @@ def analyze_document(file_path, chunk_size, overlap, output):
                 "document_size": len(content),
                 "chunk_size": chunk_size,
                 "overlap": overlap,
-                "success": result.success,
+                "success": result.is_success(),
                 "analysis": result.content,
                 "metadata": result.metadata,
                 "timestamp": datetime.now().isoformat()
@@ -269,8 +270,8 @@ def analyze_document(file_path, chunk_size, overlap, output):
 
 @chat.command()
 @click.option('--agent', '-a',
-              type=click.Choice(['qa', 'langchain', 'llm']),
-              default='qa', help='Agente para el chat')
+              type=click.Choice(['langchain']),
+              default='langchain', help='Agente para el chat')
 @click.option('--context', '-c', help='Contexto inicial')
 @click.option('--memory/--no-memory', default=True, help='Usar memoria conversacional')
 def interactive(agent, context, memory):
@@ -280,9 +281,7 @@ def interactive(agent, context, memory):
         orchestrator = await cli_context.get_orchestrator()
         
         agent_map = {
-            'qa': 'qa_agent',
-            'langchain': 'langchain_agent',
-            'llm': 'llm_agent'
+            'langchain': 'langchain_agent'
         }
         
         selected_agent = orchestrator.specialized_agents[agent_map[agent]]
@@ -320,7 +319,7 @@ def interactive(agent, context, memory):
                 # Ejecutar consulta
                 result = await selected_agent.process_request(task_input)
                 
-                if result.success:
+                if result.is_success():
                     click.echo(f"🤖 {result.content}")
                     
                     # Agregar respuesta al historial
@@ -342,8 +341,8 @@ def interactive(agent, context, memory):
 @click.argument('question')
 @click.option('--context', '-c', help='Contexto para la pregunta')
 @click.option('--agent', '-a',
-              type=click.Choice(['qa', 'langchain', 'llm']),
-              default='qa', help='Agente para responder')
+              type=click.Choice(['langchain']),
+              default='langchain', help='Agente para responder')
 def ask(question, context, agent):
     """❓ Hacer una pregunta específica."""
     
@@ -351,9 +350,7 @@ def ask(question, context, agent):
         orchestrator = await cli_context.get_orchestrator()
         
         agent_map = {
-            'qa': 'qa_agent',
-            'langchain': 'langchain_agent', 
-            'llm': 'llm_agent'
+            'langchain': 'langchain_agent'
         }
         
         selected_agent = orchestrator.specialized_agents[agent_map[agent]]
@@ -373,7 +370,7 @@ def ask(question, context, agent):
                 "question": question,
                 "context": context,
                 "agent": agent,
-                "success": result.success,
+                "success": result.is_success(),
                 "answer": result.content,
                 "metadata": result.metadata,
                 "timestamp": datetime.now().isoformat()

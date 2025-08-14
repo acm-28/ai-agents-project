@@ -49,6 +49,12 @@ def mock_agent_config():
 
 
 @pytest.fixture
+def test_agent_id():
+    """ID fijo para agentes de prueba para evitar UUIDs aleatorios."""
+    return "test_agent_fixed_id"
+
+
+@pytest.fixture
 def sample_message():
     """Mensaje de prueba."""
     return Message(

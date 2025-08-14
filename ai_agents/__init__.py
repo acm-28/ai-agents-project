@@ -16,8 +16,6 @@ from ai_agents.core.exceptions import AgentError
 
 # Agentes especializados
 from ai_agents.agents.chat.langchain_agent import LangChainChatAgent
-from ai_agents.agents.chat.llm_agent import LLMChatAgent
-from ai_agents.agents.qa.memory_qa_agent import MemoryQAAgent
 from ai_agents.agents.data_analysis.pandas_agent import PandasAgent
 
 __all__ = [
@@ -25,7 +23,5 @@ __all__ = [
     "BaseAgent", 
     "AgentError",
     "LangChainChatAgent",
-    "LLMChatAgent",
-    "MemoryQAAgent", 
     "PandasAgent"
 ]

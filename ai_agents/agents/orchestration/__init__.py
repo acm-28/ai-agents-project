@@ -1,11 +1,6 @@
 """Módulo de orquestación de agentes."""
 
-from .agent_orchestrator import (
-    AgentOrchestrator,
-    TaskType,
-    TaskClassification,
-    AgentCapability
-)
+# AgentOrchestrator básico eliminado - usando solo AdvancedOrchestrator
 from .advanced_orchestrator import (
     AdvancedOrchestrator,
     WorkflowStatus,
@@ -17,13 +12,9 @@ from .advanced_orchestrator import (
 )
 
 __all__ = [
-    'AgentOrchestrator',
-    'TaskType', 
-    'TaskClassification',
-    'AgentCapability',
     'AdvancedOrchestrator',
     'WorkflowStatus',
-    'StepStatus', 
+    'StepStatus',
     'WorkflowStep',
     'WorkflowDefinition',
     'WorkflowExecution',

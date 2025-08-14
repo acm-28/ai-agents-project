@@ -57,6 +57,10 @@ venv.bak/
 *.log
 logs/
 
+# Memory and session files (test artifacts)
+data/memory/
+data/cache/
+
 # Node.js (for future web dashboard)
 node_modules/
 npm-debug.log*

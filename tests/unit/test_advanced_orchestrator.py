@@ -47,13 +47,6 @@ class TestAdvancedOrchestrator:
         sophisticated_agent.state = Mock()
         sophisticated_agent.state.value = "READY"
         
-        qa_agent = Mock()
-        qa_agent.agent_id = "qa_agent"
-        qa_agent.process_request = AsyncMock(return_value=default_success_response)
-        qa_agent.is_ready = Mock(return_value=True)
-        qa_agent.state = Mock()
-        qa_agent.state.value = "READY"
-        
         langchain_agent = Mock()
         langchain_agent.agent_id = "langchain_agent"
         langchain_agent.process_request = AsyncMock()
@@ -61,30 +54,13 @@ class TestAdvancedOrchestrator:
         langchain_agent.state = Mock()
         langchain_agent.state.value = "READY"
         
-        llm_agent = Mock()
-        llm_agent.agent_id = "llm_agent"
-        llm_agent.process_request = AsyncMock(return_value=default_success_response)
-        llm_agent.is_ready = Mock(return_value=True)
-        llm_agent.state = Mock()
-        llm_agent.state.value = "READY"
-        
-        memory_qa_agent = Mock()
-        memory_qa_agent.agent_id = "memory_qa_agent"
-        memory_qa_agent.process_request = AsyncMock(return_value=default_success_response)
-        memory_qa_agent.is_ready = Mock(return_value=True)
-        memory_qa_agent.state = Mock()
-        memory_qa_agent.state.value = "READY"
-        
         # Crear orchestrator con parámetros de configuración y sin inicialización automática
         orchestrator = AdvancedOrchestrator(max_parallel_executions=2, auto_initialize_agents=False)
         
-        # Registrar agentes manualmente
+        # Registrar agentes manualmente (3 agentes consolidados)
         orchestrator.register_agent("pandas_agent", pandas_agent)
         orchestrator.register_agent("sophisticated_agent", sophisticated_agent)
-        orchestrator.register_agent("qa_agent", qa_agent)
         orchestrator.register_agent("langchain_agent", langchain_agent)
-        orchestrator.register_agent("llm_agent", llm_agent)
-        orchestrator.register_agent("memory_qa_agent", memory_qa_agent)
         
         # Inicializar el orchestrator
         await orchestrator.initialize()
@@ -120,7 +96,7 @@ class TestAdvancedOrchestrator:
     def test_orchestrator_initialization(self, orchestrator):
         """Testa la inicialización del orquestrador."""
         assert orchestrator.max_parallel_executions == 2
-        assert len(orchestrator.specialized_agents) >= 5  # Al menos los 5 mock registrados
+        assert len(orchestrator.specialized_agents) >= 3  # Al menos los 3 agentes consolidados registrados
         assert orchestrator.semaphore._value == 2
         assert len(orchestrator.workflow_definitions) >= 1  # Al menos los predefinidos
 
@@ -197,7 +173,7 @@ class TestAdvancedOrchestrator:
                 ),
                 WorkflowStep(
                     step_id="stepC",
-                    agent_type="qa_agent",
+                    agent_type="langchain_agent",
                     task_config={
                         "task": "Reporte final",
                         "data": "{{stepA.result}}",
@@ -399,7 +375,7 @@ class TestAdvancedOrchestrator:
         )
         
         assert execution.status == WorkflowStatus.COMPLETED
-        assert len(execution.results) == 4
+        assert len(execution.results) == 4  # load_data + basic_analysis + text_summary + qa_validation
         assert "load_data" in execution.results
         assert "basic_analysis" in execution.results
         assert "text_summary" in execution.results

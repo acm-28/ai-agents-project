@@ -37,33 +37,19 @@ class TestAdvancedOrchestratorBasic:
             content="Mock response", success=True
         ))
         
-        qa_agent = Mock()
-        qa_agent.agent_id = "qa_agent"
-        qa_agent.process_request = AsyncMock(return_value=AgentResponse(
-            content="Mock response", success=True
-        ))
-        
         langchain_agent = Mock()
         langchain_agent.agent_id = "langchain_agent"
         langchain_agent.process_request = AsyncMock(return_value=AgentResponse(
             content="Mock response", success=True
         ))
         
-        llm_agent = Mock()
-        llm_agent.agent_id = "llm_agent"
-        llm_agent.process_request = AsyncMock(return_value=AgentResponse(
-            content="Mock response", success=True
-        ))
-        
         orchestrator = AdvancedOrchestrator(agent_id="advanced_orchestrator")
         
-        # Configurar agentes especializados manualmente
+        # Configurar agentes especializados manualmente (3 agentes consolidados)
         orchestrator.specialized_agents = {
             "pandas_agent": pandas_agent,
             "sophisticated_agent": sophisticated_agent,
-            "qa_agent": qa_agent,
-            "langchain_agent": langchain_agent,
-            "llm_agent": llm_agent
+            "langchain_agent": langchain_agent
         }
         
         # Inicializar
@@ -97,7 +83,7 @@ class TestAdvancedOrchestratorBasic:
     async def test_orchestrator_initialization(self, orchestrator):
         """Testa la inicialización del orquestrador."""
         assert orchestrator is not None
-        assert len(orchestrator.specialized_agents) >= 5  # Pueden ser más por agentes por defecto
+        assert len(orchestrator.specialized_agents) >= 3  # 3 agentes consolidados
         assert orchestrator.max_concurrent_workflows == 10
         assert len(orchestrator.workflow_definitions) >= 0
 
@@ -156,9 +142,7 @@ class TestAdvancedOrchestratorBasic:
         
         assert "pandas_agent" in available_agents
         assert "sophisticated_agent" in available_agents
-        assert "qa_agent" in available_agents
         assert "langchain_agent" in available_agents
-        assert "llm_agent" in available_agents
 
     def test_workflow_step_creation(self):
         """Testa creación de pasos de workflow."""

@@ -12,11 +12,12 @@ from ai_agents.agents.orchestration.advanced_orchestrator import (
     AdvancedOrchestrator,
     WorkflowDefinition,
     WorkflowStep,
-    WorkflowStatus
+    WorkflowStatus,
+    StepStatus
 )
 from ai_agents.agents.chat.langchain_agent import LangChainChatAgent
-from ai_agents.agents.chat.llm_agent import LLMChatAgent
-from ai_agents.agents.qa.memory_qa_agent import MemoryQAAgent
+from ai_agents.agents.chat.langchain_agent import LangChainChatAgent
+from ai_agents.agents.chat.langchain_agent import LangChainChatAgent
 from ai_agents.agents.data_analysis.pandas_agent import PandasAgent
 from ai_agents.agents.workflows.sophisticated_agent import SophisticatedAgent
 
@@ -28,12 +29,13 @@ async def create_sample_data():
     data_dir.mkdir(exist_ok=True)
     
     # Crear dataset de ventas
+    n_rows = 100
     sales_data = pd.DataFrame({
-        'fecha': pd.date_range('2024-01-01', periods=100, freq='D'),
-        'producto': ['A', 'B', 'C'] * 34 + ['A', 'B'],
-        'ventas': [100 + i*2 + (i%7)*10 for i in range(100)],
-        'region': ['Norte', 'Sur', 'Este', 'Oeste'] * 25,
-        'vendedor': [f'Vendedor_{i%10}' for i in range(100)]
+        'fecha': pd.date_range('2024-01-01', periods=n_rows, freq='D'),
+        'producto': ['A', 'B', 'C'] * (n_rows // 3) + ['A'] * (n_rows % 3),
+        'ventas': [100 + i*2 + (i%7)*10 for i in range(n_rows)],
+        'region': ['Norte', 'Sur', 'Este', 'Oeste'] * (n_rows // 4) + ['Norte'] * (n_rows % 4),
+        'vendedor': [f'Vendedor_{i%10}' for i in range(n_rows)]
     })
     
     sales_file = data_dir / "ventas_demo.csv"
@@ -62,38 +64,37 @@ async def setup_orchestrator():
     # Crear agentes (usando versiones simplificadas para demo)
     pandas_agent = PandasAgent()
     sophisticated_agent = SophisticatedAgent()
-    qa_agent = MemoryQAAgent()
-    langchain_agent = LangChainChatAgent()
-    llm_agent = LLMChatAgent()
+    qa_agent = LangChainChatAgent(enable_persistence=True)  # Modo Q&A con memoria
+    langchain_agent = LangChainChatAgent(enable_persistence=False)  # Modo chat simple
     
     # Crear orquestrador avanzado
     orchestrator = AdvancedOrchestrator(
-        pandas_agent=pandas_agent,
-        sophisticated_agent=sophisticated_agent,
-        qa_agent=qa_agent,
-        langchain_agent=langchain_agent,
-        llm_agent=llm_agent,
         max_parallel_executions=3
     )
     
-    print("✅ Orquestrador configurado con 5 agentes especializados")
+    # Registrar agentes
+    orchestrator.register_agent("pandas_agent", pandas_agent)
+    orchestrator.register_agent("sophisticated_agent", sophisticated_agent)
+    orchestrator.register_agent("qa_agent", qa_agent)
+    orchestrator.register_agent("langchain_agent", langchain_agent)
+    
+    print("✅ Orquestrador configurado con 4 agentes especializados")
     return orchestrator
 
 
 def create_business_intelligence_workflow():
     """Crear un workflow complejo de Business Intelligence."""
     return WorkflowDefinition(
-        id="business_intelligence_complete",
+        workflow_id="business_intelligence_complete",
         name="Análisis Completo de Business Intelligence",
         description="Workflow integral que combina análisis de datos, procesamiento de documentos y generación de insights",
         steps=[
             # Paso 1: Análisis estadístico de datos de ventas
             WorkflowStep(
-                id="sales_analysis",
-                name="Análisis Estadístico de Ventas",
-                agent_id="pandas_agent",
-                task="Realizar análisis estadístico completo de los datos de ventas",
-                inputs={
+                step_id="sales_analysis",
+                agent_type="pandas_agent",
+                task_config={
+                    "action": "analyze",
                     "file_path": "{{workflow_input.sales_file}}",
                     "analysis_type": "comprehensive",
                     "operations": ["describe", "correlations", "trends"]
@@ -103,11 +104,10 @@ def create_business_intelligence_workflow():
             
             # Paso 2: Análisis de documentos en paralelo
             WorkflowStep(
-                id="document_analysis",
-                name="Análisis de Documentos Corporativos",
-                agent_id="sophisticated_agent",
-                task="Extraer insights y patrones de documentos corporativos",
-                inputs={
+                step_id="document_analysis",
+                agent_type="sophisticated_agent",
+                task_config={
+                    "action": "analyze_documents",
                     "documents_path": "{{workflow_input.docs_file}}",
                     "analysis_focus": ["trends", "recommendations", "performance"]
                 },
@@ -116,11 +116,10 @@ def create_business_intelligence_workflow():
             
             # Paso 3: Q&A sobre los resultados (depende de ambos análisis)
             WorkflowStep(
-                id="insights_qa",
-                name="Generación de Insights via Q&A",
-                agent_id="qa_agent",
-                task="Responder preguntas específicas basadas en los análisis realizados",
-                inputs={
+                step_id="insights_qa",
+                agent_type="qa_agent",
+                task_config={
+                    "action": "qa_analysis",
                     "context_sales": "{{sales_analysis.result}}",
                     "context_docs": "{{document_analysis.result}}",
                     "questions": [
@@ -134,11 +133,10 @@ def create_business_intelligence_workflow():
             
             # Paso 4: Reporte ejecutivo
             WorkflowStep(
-                id="executive_report",
-                name="Generación de Reporte Ejecutivo",
-                agent_id="langchain_agent",
-                task="Crear un reporte ejecutivo consolidado",
-                inputs={
+                step_id="executive_report",
+                agent_type="langchain_agent",
+                task_config={
+                    "action": "create_report",
                     "sales_data": "{{sales_analysis.result}}",
                     "document_insights": "{{document_analysis.result}}",
                     "qa_insights": "{{insights_qa.result}}",
@@ -149,11 +147,10 @@ def create_business_intelligence_workflow():
             
             # Paso 5: Recomendaciones estratégicas
             WorkflowStep(
-                id="strategic_recommendations",
-                name="Generación de Recomendaciones Estratégicas",
-                agent_id="llm_agent",
-                task="Generar recomendaciones estratégicas basadas en todos los análisis",
-                inputs={
+                step_id="strategic_recommendations",
+                agent_type="langchain_agent",
+                task_config={
+                    "action": "generate_recommendations",
                     "comprehensive_analysis": "{{executive_report.result}}",
                     "focus_areas": ["growth", "optimization", "risk_management"]
                 },
@@ -172,17 +169,16 @@ def create_business_intelligence_workflow():
 def create_parallel_processing_workflow():
     """Crear un workflow que demuestra procesamiento paralelo."""
     return WorkflowDefinition(
-        id="parallel_processing_demo",
+        workflow_id="parallel_processing_demo",
         name="Demostración de Procesamiento Paralelo",
         description="Workflow que ejecuta múltiples análisis independientes en paralelo",
         steps=[
             # Pasos paralelos - no dependen entre sí
             WorkflowStep(
-                id="quick_stats",
-                name="Estadísticas Rápidas",
-                agent_id="pandas_agent",
-                task="Generar estadísticas básicas rápidamente",
-                inputs={
+                step_id="quick_stats",
+                agent_type="pandas_agent",
+                task_config={
+                    "action": "basic_stats",
                     "file_path": "{{workflow_input.sales_file}}",
                     "analysis_type": "basic"
                 },
@@ -190,11 +186,10 @@ def create_parallel_processing_workflow():
             ),
             
             WorkflowStep(
-                id="text_summary",
-                name="Resumen de Texto",
-                agent_id="sophisticated_agent",
-                task="Crear resumen de documentos",
-                inputs={
+                step_id="text_summary",
+                agent_type="sophisticated_agent",
+                task_config={
+                    "action": "summarize",
                     "documents_path": "{{workflow_input.docs_file}}",
                     "summary_length": "short"
                 },
@@ -202,11 +197,10 @@ def create_parallel_processing_workflow():
             ),
             
             WorkflowStep(
-                id="quick_qa",
-                name="Q&A Rápido",
-                agent_id="qa_agent",
-                task="Responder pregunta simple",
-                inputs={
+                step_id="quick_qa",
+                agent_type="qa_agent",
+                task_config={
+                    "action": "answer_question",
                     "question": "¿Cuál es el contexto general de los datos?",
                     "context": "análisis de ventas y documentos corporativos"
                 },
@@ -215,11 +209,10 @@ def create_parallel_processing_workflow():
             
             # Paso final que combina todos los resultados paralelos
             WorkflowStep(
-                id="parallel_summary",
-                name="Resumen de Procesamiento Paralelo",
-                agent_id="langchain_agent",
-                task="Consolidar resultados de procesamiento paralelo",
-                inputs={
+                step_id="parallel_summary",
+                agent_type="langchain_agent",
+                task_config={
+                    "action": "consolidate_results",
                     "stats": "{{quick_stats.result}}",
                     "summary": "{{text_summary.result}}",
                     "qa": "{{quick_qa.result}}"
@@ -246,7 +239,7 @@ async def demonstrate_workflow_execution(orchestrator, workflow, inputs, workflo
     
     # Registrar y ejecutar workflow
     orchestrator.register_workflow(workflow)
-    execution = await orchestrator.execute_workflow(workflow.id, inputs)
+    execution = await orchestrator.execute_workflow(workflow.workflow_id, inputs)
     
     end_time = datetime.now()
     execution_time = (end_time - start_time).total_seconds()
@@ -255,7 +248,7 @@ async def demonstrate_workflow_execution(orchestrator, workflow, inputs, workflo
     print(f"\n📊 Resultados del workflow '{workflow_name}':")
     print(f"   Estado: {execution.status.value}")
     print(f"   Tiempo de ejecución: {execution_time:.2f} segundos")
-    print(f"   Pasos completados: {len([r for r in execution.step_results.values() if r.status.name == 'COMPLETED'])}/{len(workflow.steps)}")
+    print(f"   Pasos completados: {len([s for s in execution.workflow_def.steps if s.status == StepStatus.COMPLETED])}/{len(workflow.steps)}")
     
     if execution.status == WorkflowStatus.COMPLETED:
         print("\n✅ Workflow completado exitosamente!")
@@ -270,7 +263,7 @@ async def demonstrate_workflow_execution(orchestrator, workflow, inputs, workflo
                 content_preview = result.agent_response.content[:100] + "..." if len(result.agent_response.content) > 100 else result.agent_response.content
                 print(f"      Resultado: {content_preview}")
     else:
-        print(f"\n❌ Workflow falló: {execution.error}")
+        print(f"\n❌ Workflow falló. Errores: {execution.errors}")
     
     return execution
 

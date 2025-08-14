@@ -14,10 +14,7 @@ from datetime import datetime
 from ai_agents.agents import (
     PandasAgent,
     SophisticatedAgent,
-    MemoryQAAgent,
     LangChainChatAgent,
-    LLMChatAgent,
-    AgentOrchestrator,
     AdvancedOrchestrator
 )
 from ai_agents.agents.orchestration.advanced_orchestrator import (
@@ -45,9 +42,7 @@ class CLIContext:
             # Crear agentes especializados
             pandas_agent = PandasAgent()
             sophisticated_agent = SophisticatedAgent()
-            qa_agent = MemoryQAAgent()
             langchain_agent = LangChainChatAgent()
-            llm_agent = LLMChatAgent()
             
             # Crear orquestrador
             self.orchestrator = AdvancedOrchestrator(agent_id="cli_orchestrator")
@@ -56,9 +51,7 @@ class CLIContext:
             self.orchestrator.specialized_agents = {
                 "pandas_agent": pandas_agent,
                 "sophisticated_agent": sophisticated_agent,
-                "qa_agent": qa_agent,
-                "langchain_agent": langchain_agent,
-                "llm_agent": llm_agent
+                "langchain_agent": langchain_agent
             }
             
             # Inicializar
@@ -145,7 +138,7 @@ def orchestrator():
 
 @agent.command()
 @click.argument('agent_type', type=click.Choice([
-    'pandas', 'sophisticated', 'qa', 'langchain', 'llm'
+    'pandas', 'sophisticated', 'langchain'
 ]))
 @click.argument('task')
 @click.option('--context', '-c', help='Contexto adicional para la tarea')
@@ -170,10 +163,8 @@ def run(agent_type, task, context, file):
         # Mapear tipo de agente
         agent_map = {
             'pandas': 'pandas_agent',
-            'sophisticated': 'sophisticated_agent', 
-            'qa': 'qa_agent',
-            'langchain': 'langchain_agent',
-            'llm': 'llm_agent'
+            'sophisticated': 'sophisticated_agent',
+            'langchain': 'langchain_agent'
         }
         
         agent_id = agent_map[agent_type]
@@ -187,7 +178,7 @@ def run(agent_type, task, context, file):
             output = {
                 "agent": agent_type,
                 "task": task,
-                "success": result.success,
+                "success": result.is_success(),
                 "result": result.content,
                 "metadata": result.metadata,
                 "timestamp": datetime.now().isoformat()

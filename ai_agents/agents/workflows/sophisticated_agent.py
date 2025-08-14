@@ -6,7 +6,7 @@ usando LangGraph StateGraph con múltiples nodos especializados.
 """
 
 import logging
-from typing import Dict, Any, List, Optional, TypedDict
+from typing import Dict, Any, List, Optional, TypedDict, Union
 from dataclasses import dataclass
 
 from langchain.prompts import PromptTemplate
@@ -22,7 +22,7 @@ except ImportError:
     START = END = None
 
 from ...core.base_agent import BaseAgent
-from ...core.types import AgentResponse
+from ...core.types import AgentResponse, Message
 
 logger = logging.getLogger(__name__)
 
@@ -400,3 +400,16 @@ Respuesta estructurada:
     def get_last_analysis(self) -> Optional[AnalysisResult]:
         """Obtiene el último análisis realizado."""
         return self.last_analysis
+    
+    async def process_request(self, input_data: Union[str, Dict, Message]) -> AgentResponse:
+        """
+        Interfaz pública para procesar requests.
+        Delega al método process con manejo seguro.
+        
+        Args:
+            input_data: Datos de entrada
+            
+        Returns:
+            AgentResponse con la respuesta del agente
+        """
+        return await self._safe_process(input_data)

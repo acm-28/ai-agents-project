@@ -4,6 +4,7 @@ from ai_agents.utils.helpers import preprocess_data, log_message, calculate_metr
 from ai_agents.utils.validators import validate_message, validate_config
 from ai_agents.utils.formatters import format_response, format_conversation
 from ai_agents.utils.decorators import retry, measure_time, log_calls
+from ai_agents.utils.conversation_logger import ConversationLogger, conversation_logger
 
 __all__ = [
     "preprocess_data",
@@ -15,5 +16,7 @@ __all__ = [
     "format_conversation",
     "retry",
     "measure_time",
-    "log_calls"
+    "log_calls",
+    "ConversationLogger",
+    "conversation_logger"
 ]

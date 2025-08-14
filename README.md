@@ -21,13 +21,12 @@ The **AI Agents Framework** is a comprehensive, production-ready system for buil
 ai-agents-project/
 ├── 📁 ai_agents/                      # 🎯 Core Framework
 │   ├── agents/                        # Agent implementations
-│   │   ├── chat/                      # Chat agents (LangChain, LLM)
+│   │   ├── chat/                      # Chat agents (LangChain consolidado)
 │   │   ├── data_analysis/             # Data analysis agents & tools
 │   │   │   ├── pandas_agent.py        # Advanced Pandas agent
 │   │   │   ├── tools/                 # Analysis tools & processors
 │   │   │   ├── processors/            # Data processors
 │   │   │   └── workflows/             # Analysis workflows
-│   │   ├── qa/                        # Q&A agents with memory
 │   │   ├── workflows/                 # Complex workflow agents
 │   │   └── orchestration/             # Agent orchestrators
 │   │       ├── agent_orchestrator.py  # Basic orchestrator
@@ -108,9 +107,7 @@ ai-agents-project/
 |-------|-------------|--------------|
 | **PandasAgent** | Data analysis with Pandas | CSV/Excel processing, statistical analysis, visualization |
 | **SophisticatedAgent** | Complex workflow execution | Multi-step reasoning, context management |
-| **MemoryQAAgent** | Q&A with conversation memory | Persistent context, knowledge retrieval |
-| **LangChainChatAgent** | Modern chat interface | LangChain integration, flexible conversations |
-| **LLMChatAgent** | Direct LLM communication | Raw OpenAI API access |
+| **LangChainChatAgent** | Unified chat interface | LangChain integration, memory persistence, multi-session support, Q&A capabilities |
 
 ### 🎭 **Advanced Orchestration**
 
@@ -292,7 +289,57 @@ settings.enable_auto_scaling = True
 settings.load_balancing_strategy = "round_robin"
 ```
 
-## 📊 Monitoring & Metrics
+## � Recent Updates: Agent Consolidation
+
+### **LangChainChatAgent Consolidation** *(Latest)*
+
+We've successfully consolidated three chat agents into a single, more powerful agent:
+
+#### **What Changed**
+- **❌ Removed**: `LLMChatAgent` (basic chat without memory)
+- **✅ Enhanced**: `LangChainChatAgent` with persistent memory capabilities and Q&A functionality
+- **✅ Integrated**: `MemoryQAAgent` functionality into `LangChainChatAgent`
+
+#### **New Features**
+- **🗂️ Multi-session Support**: Independent conversations per user/session
+- **💾 Memory Persistence**: Automatic saving/loading from JSON files
+- **⚙️ Configurable Persistence**: Enable/disable memory as needed
+- **📊 Session Management**: Advanced session monitoring and cleanup
+
+#### **Usage Examples**
+
+```python
+from ai_agents.agents.chat.langchain_agent import LangChainChatAgent
+
+# Chat with memory persistence (default)
+agent = LangChainChatAgent(enable_persistence=True)
+
+# Simple chat without memory (replaces LLMChatAgent)
+simple_agent = LangChainChatAgent(enable_persistence=False)
+
+# Q&A with persistent memory (replaces MemoryQAAgent)
+await agent.process({
+    "content": "What is the capital of France?",
+    "session_id": "user123"
+})
+await agent.process({
+    "content": "What's its population?",  # Remembers Paris
+    "session_id": "user123"
+})
+
+# Session management
+summary = agent.get_session_summary("user123")
+agent.clear_session("user123")
+```
+
+#### **Migration Guide**
+- **From LLMChatAgent**: Use `LangChainChatAgent(enable_persistence=False)`
+- **From MemoryQAAgent**: Use `LangChainChatAgent(enable_persistence=True)`
+- **From LangChainChatAgent**: No changes needed, persistence is now optional
+
+> **📖 Detailed Guide**: See `docs/agents/langchain_agent_consolidation.md` for complete usage examples.
+
+## �📊 Monitoring & Metrics
 
 ### CLI Monitoring
 ```bash
@@ -647,7 +694,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **📦 Package**: Installable via `pip install -e .`
 - **🧪 Test Coverage**: 82%+ (72/87 tests passing)
 - **📝 Lines of Code**: 5,000+ lines across framework
-- **🤖 Agent Types**: 6 specialized agent implementations
+- **🤖 Agent Types**: 3 specialized agent implementations (fully consolidated)
 - **🔌 API Endpoints**: 15+ REST endpoints with full documentation
 - **⌨️ CLI Commands**: 25+ command-line operations
 

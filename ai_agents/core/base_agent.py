@@ -12,6 +12,7 @@ from datetime import datetime
 from ai_agents.core.types import AgentResponse, AgentState, AgentConfig, Message
 from ai_agents.core.exceptions import AgentError, InitializationError, ProcessingError
 from ai_agents.config.settings import settings
+from ai_agents.utils.conversation_logger import conversation_logger
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,10 @@ class BaseAgent(ABC):
         self._is_initialized = False
         self._initialization_time = None
         
+        # Conversation logging
+        self._current_conversation_log_id: Optional[str] = None
+        self._enable_conversation_logging = True
+        
         # Configuración
         if isinstance(config, dict):
             self.config = AgentConfig(**config)
@@ -56,7 +61,7 @@ class BaseAgent(ABC):
         # Logger específico del agente
         self.logger = logging.getLogger(f"ai_agents.{self.__class__.__name__}")
         
-        self.logger.info(f"Agente {self.agent_id} creado con configuración: {self.config.model_dump()}")
+        self.logger.info(f"Agente {self.agent_id} creado con configuración: {self.config.dict()}")
     
     @abstractmethod
     async def initialize(self) -> None:
@@ -153,8 +158,128 @@ class BaseAgent(ABC):
     
     async def cleanup(self) -> None:
         """Limpia recursos del agente."""
+        # Finalizar conversación si está activa
+        if self._current_conversation_log_id and self._enable_conversation_logging:
+            self._end_conversation_log("agent_shutdown")
+        
         self.state = AgentState.STOPPED
         self.logger.info(f"Agente {self.agent_id} detenido y recursos limpiados")
+    
+    def start_conversation_log(self, 
+                              session_id: str, 
+                              user_id: Optional[str] = None,
+                              metadata: Optional[Dict] = None) -> str:
+        """
+        Inicia el logging de una nueva conversación.
+        
+        Args:
+            session_id: ID de la sesión
+            user_id: ID del usuario (opcional)
+            metadata: Metadatos adicionales
+            
+        Returns:
+            ID del log de conversación
+        """
+        if not self._enable_conversation_logging:
+            return ""
+        
+        # Finalizar conversación anterior si existe
+        if self._current_conversation_log_id:
+            self._end_conversation_log("new_conversation_started")
+        
+        self._current_conversation_log_id = conversation_logger.log_conversation_start(
+            agent_id=self.agent_id,
+            session_id=session_id,
+            agent_type=self.__class__.__name__,
+            user_id=user_id,
+            metadata=metadata
+        )
+        
+        return self._current_conversation_log_id
+    
+    def log_user_message(self, 
+                        message: str, 
+                        metadata: Optional[Dict] = None) -> None:
+        """
+        Registra un mensaje del usuario en el log de conversación.
+        
+        Args:
+            message: Contenido del mensaje del usuario
+            metadata: Metadatos adicionales
+        """
+        if self._current_conversation_log_id and self._enable_conversation_logging:
+            conversation_logger.log_user_message(
+                conversation_log_id=self._current_conversation_log_id,
+                message=message,
+                metadata=metadata
+            )
+    
+    def log_agent_response(self, 
+                          response: str, 
+                          processing_time_ms: Optional[float] = None,
+                          model_used: Optional[str] = None,
+                          metadata: Optional[Dict] = None) -> None:
+        """
+        Registra una respuesta del agente en el log de conversación.
+        
+        Args:
+            response: Contenido de la respuesta del agente
+            processing_time_ms: Tiempo de procesamiento en milisegundos
+            model_used: Modelo utilizado
+            metadata: Metadatos adicionales
+        """
+        if self._current_conversation_log_id and self._enable_conversation_logging:
+            conversation_logger.log_agent_response(
+                conversation_log_id=self._current_conversation_log_id,
+                response=response,
+                processing_time_ms=processing_time_ms,
+                model_used=model_used,
+                metadata=metadata
+            )
+    
+    def log_agent_error(self, 
+                       error_message: str, 
+                       error_type: str,
+                       metadata: Optional[Dict] = None) -> None:
+        """
+        Registra un error del agente en el log de conversación.
+        
+        Args:
+            error_message: Mensaje de error
+            error_type: Tipo de error
+            metadata: Metadatos adicionales
+        """
+        if self._current_conversation_log_id and self._enable_conversation_logging:
+            conversation_logger.log_agent_error(
+                conversation_log_id=self._current_conversation_log_id,
+                error_message=error_message,
+                error_type=error_type,
+                metadata=metadata
+            )
+    
+    def _end_conversation_log(self, reason: str = "normal_end") -> None:
+        """
+        Finaliza el log de conversación actual.
+        
+        Args:
+            reason: Razón del fin de la conversación
+        """
+        if self._current_conversation_log_id and self._enable_conversation_logging:
+            conversation_logger.log_conversation_end(
+                conversation_log_id=self._current_conversation_log_id,
+                reason=reason
+            )
+            self._current_conversation_log_id = None
+    
+    def enable_conversation_logging(self, enabled: bool = True) -> None:
+        """
+        Habilita o deshabilita el logging de conversaciones.
+        
+        Args:
+            enabled: True para habilitar, False para deshabilitar
+        """
+        self._enable_conversation_logging = enabled
+        self.logger.info(f"Conversation logging {'enabled' if enabled else 'disabled'} for agent {self.agent_id}")
     
     def get_info(self) -> Dict[str, Any]:
         """Retorna información del agente."""
@@ -162,7 +287,7 @@ class BaseAgent(ABC):
             "agent_id": self.agent_id,
             "agent_type": self.__class__.__name__,
             "state": self.state.value,
-            "config": self.config.model_dump(),
+            "config": self.config.dict(),
             "metadata": self.metadata,
             "created_at": self.created_at.isoformat(),
             "is_initialized": self._is_initialized,

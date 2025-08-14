@@ -22,7 +22,7 @@ class TestSophisticatedAgent:
     @pytest_asyncio.fixture
     async def agent(self):
         """Fixture del agente."""
-        agent = SophisticatedAgent()
+        agent = SophisticatedAgent(agent_id="test_sophisticated_agent_fixed_id")
         
         # Mock LLM para evitar llamadas reales a OpenAI
         mock_llm = AsyncMock()
@@ -237,7 +237,7 @@ class TestSophisticatedAgent:
     async def test_fallback_mode_without_langgraph(self, sample_texts):
         """Test modo de respaldo sin LangGraph."""
         # Crear agente sin LangGraph
-        agent = SophisticatedAgent()
+        agent = SophisticatedAgent(agent_id="test_sophisticated_fallback_agent")
         
         mock_llm = AsyncMock()
         mock_response = MagicMock()

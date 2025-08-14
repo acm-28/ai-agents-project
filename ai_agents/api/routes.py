@@ -36,7 +36,7 @@ async def send_chat_message(request: ChatRequest):
     agent_map = {
         'qa': 'qa_agent',
         'langchain': 'langchain_agent',
-        'llm': 'llm_agent'
+        'langchain': 'langchain_agent'
     }
     
     if request.agent_type not in agent_map:
